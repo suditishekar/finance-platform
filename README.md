@@ -1,23 +1,25 @@
-# Finance Data Processing and Access Control Backend
+# Finance Backend
 
-A backend API for a finance dashboard system with role-based access control, financial record management, and summary-level analytics.
+A TypeScript backend API for Finance with role-based access control, PostgreSQL-backed transaction management, analytics, and reconciliation.
 
 ## Stack
 
 - **Runtime:** Node.js + TypeScript
 - **Framework:** Express
-- **Database:** MongoDB (Atlas) via Mongoose
+- **Database:** MongoDB (Atlas) via Mongoose for users/auth; PostgreSQL for transactions
 - **Auth:** JWT + bcrypt
 - **Validation:** Zod
+- **Frontend:** React + TypeScript + Vite in `frontend/`
 
 ## Project Structure
 
 ```
 src/
-├── config/db.ts              # MongoDB connection
+├── config/db.ts              # MongoDB connection for users/auth
+├── config/postgres.ts        # PostgreSQL pool and transaction table setup
 ├── controllers/              # Route handler logic
 ├── middleware/               # Auth + error handling
-├── models/                   # Mongoose schemas
+├── models/                   # Mongoose user model and PostgreSQL transaction model
 ├── routes/                   # Route definitions
 ├── utils/                    # JWT, response helpers, catchAsync
 └── validators/               # Zod input schemas
@@ -32,14 +34,9 @@ cd zorvyn-finance-backend
 npm install
 ```
 
-**2. Create a `.env` file** (use `.env.example` as reference)
-```
-PORT=5000
-MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/zorvyn_finance
-JWT_SECRET=your_jwt_secret
-JWT_EXPIRES_IN=7d
-NODE_ENV=development
-```
+**2. Create a `.env` file using `.env.example` as a reference.** Keep the MongoDB and PostgreSQL credentials out of source control.
+
+The backend requires `MONGODB_URI` for existing authentication/user data and `POSTGRES_URL` (or `DATABASE_URL`) for transaction data.
 
 **3. Start the development server**
 ```bash
@@ -52,9 +49,9 @@ The server runs on `http://localhost:5000`.
 
 | Role     | Dashboard | View Records | Create Records | Update/Delete Records | Manage Users |
 |----------|-----------|--------------|----------------|-----------------------|--------------|
-| viewer   | ✓         | ✗            | ✗              | ✗                     | ✗            |
-| analyst  | ✓         | ✓            | ✗              | ✗                     | ✗            |
-| admin    | ✓         | ✓            | ✓              | ✓                     | ✓            |
+| viewer   | ✓         | ✗            | ✗             | ✗                     | ✗           |
+| analyst  | ✓         | ✓            | ✗             | ✗                     | ✗           |
+| admin    | ✓         | ✓            | ✓             | ✓                     | ✓           |
 
 ## API Endpoints
 
@@ -96,6 +93,16 @@ The server runs on `http://localhost:5000`.
 | GET    | `/trends`       | Any    | Monthly income/expense for last N months |
 | GET    | `/recent`       | Any    | Most recent N transactions               |
 
+Analytics endpoints also include `/daily-summary`, `/monthly-summary`, `/category-analysis`, and `/trend-analysis`; all require authentication and accept validated `from` and `to` date query parameters.
+
+### Reconciliation — `/api/reconciliation`
+
+| Method | Endpoint  | Access          | Description                                      |
+|--------|-----------|-----------------|--------------------------------------------------|
+| POST   | `/compare`| Admin, Analyst   | Compare active PostgreSQL records with references|
+
+The reconciliation request supplies `referenceTransactions` with `id`, `amount`, `type`, and `category`. It reports matched records, missing internal/external records, and field-level mismatches without modifying transactions.
+
 ## Request / Response Format
 
 All responses follow a consistent shape:
@@ -113,7 +120,22 @@ Authorization: Bearer <token>
 ## Assumptions and Design Notes
 
 - **Soft deletes:** Financial records are never permanently deleted. A `deletedAt` timestamp is set and the record is excluded from all queries. This preserves data for audit purposes.
-- **Role default:** Newly registered users default to `viewer` unless a role is specified. In a production system, role assignment would be restricted to admins only.
+- **Role default:** Newly registered users always default to `viewer`. Role changes are restricted to the admin user-management flow.
 - **Category is free text:** There is no fixed category list. The `type` field is restricted to `income` or `expense`; category can be anything (Salary, Rent, Freelance, etc.).
 - **Password security:** Passwords are hashed with bcrypt (10 salt rounds) and the field is excluded from all database queries by default at the schema level.
 - **No hard deletes on users:** Deleting a user deactivates them (`status: inactive`). Deactivated users cannot log in and their existing tokens are rejected.
+
+## Frontend setup
+
+```bash
+cd frontend
+npm install
+copy .env.example .env
+npm run dev
+```
+
+Set `VITE_API_BASE_URL` to the backend API base URL, normally `http://localhost:5000/api`. The frontend stores its JWT in the browser session and stores workspace currency preferences locally; selecting a currency changes display formatting only and does not perform foreign-exchange conversion.
+
+## Testing
+
+Backend deterministic unit tests run with `npm test`. They cover reconciliation comparison behavior and validation boundaries. Full database-backed API and browser acceptance flows require configured local MongoDB/PostgreSQL services and should be verified in the local environment.

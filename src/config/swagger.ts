@@ -49,6 +49,35 @@ const options: swaggerJsdoc.Options = {
             message: { type: 'string' },
           },
         },
+        ReconciliationMismatch: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            internal: { $ref: '#/components/schemas/FinancialRecord' },
+            external: { type: 'object' },
+            differences: { type: 'array', items: { type: 'string', enum: ['amount', 'type', 'category'] } },
+          },
+        },
+        ReconciliationResult: {
+          type: 'object',
+          properties: {
+            summary: {
+              type: 'object',
+              properties: {
+                totalInternalRecords: { type: 'integer' },
+                totalExternalRecords: { type: 'integer' },
+                matchedCount: { type: 'integer' },
+                missingInternally: { type: 'integer' },
+                missingExternally: { type: 'integer' },
+                mismatchedCount: { type: 'integer' },
+              },
+            },
+            matched: { type: 'array', items: { type: 'string', format: 'uuid' } },
+            missingInternally: { type: 'array', items: { type: 'object' } },
+            missingExternally: { type: 'array', items: { type: 'object' } },
+            mismatched: { type: 'array', items: { $ref: '#/components/schemas/ReconciliationMismatch' } },
+          },
+        },
       },
     },
     tags: [
@@ -56,6 +85,7 @@ const options: swaggerJsdoc.Options = {
       { name: 'Users', description: 'User management — Admin only' },
       { name: 'Records', description: 'Financial records CRUD' },
       { name: 'Dashboard', description: 'Summary and analytics endpoints' },
+      { name: 'Reconciliation', description: 'Compare PostgreSQL transactions with supplied reference data' },
     ],
     paths: {
       '/auth/register': {
@@ -73,7 +103,6 @@ const options: swaggerJsdoc.Options = {
                     name: { type: 'string', example: 'Sudit Admin' },
                     email: { type: 'string', example: 'admin@zorvyn.com' },
                     password: { type: 'string', example: 'secret123' },
-                    role: { type: 'string', enum: ['admin', 'analyst', 'viewer'], example: 'admin' },
                   },
                 },
               },
@@ -133,6 +162,34 @@ const options: swaggerJsdoc.Options = {
             403: { description: 'Forbidden' },
           },
         },
+        post: {
+          tags: ['Users'],
+          summary: 'Create a user — Admin only',
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['name', 'email', 'password', 'role'],
+                  properties: {
+                    name: { type: 'string', example: 'Finance Analyst' },
+                    email: { type: 'string', example: 'analyst@example.com' },
+                    password: { type: 'string', example: 'secret123' },
+                    role: { type: 'string', enum: ['admin', 'analyst', 'viewer'] },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            201: { description: 'User created without password or token data' },
+            403: { description: 'Forbidden' },
+            409: { description: 'Email already in use' },
+            422: { description: 'Validation error' },
+          },
+        },
       },
       '/users/{id}': {
         get: {
@@ -171,11 +228,11 @@ const options: swaggerJsdoc.Options = {
         },
         delete: {
           tags: ['Users'],
-          summary: 'Deactivate a user — Admin only',
+          summary: 'Permanently delete a user — Admin only',
           security: [{ bearerAuth: [] }],
           parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
           responses: {
-            200: { description: 'User deactivated' },
+            200: { description: 'User deleted without password or token data' },
             404: { description: 'User not found' },
           },
         },
@@ -280,8 +337,73 @@ const options: swaggerJsdoc.Options = {
           tags: ['Dashboard'],
           summary: 'Total income, expenses, and net balance — All roles',
           security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: 'from', in: 'query', required: false, schema: { type: 'string', format: 'date' }, description: 'Optional range start; requires to' },
+            { name: 'to', in: 'query', required: false, schema: { type: 'string', format: 'date' }, description: 'Optional range end; requires from' },
+          ],
           responses: {
             200: { description: 'Summary totals' },
+            422: { description: 'Invalid date range' },
+          },
+        },
+      },
+      '/dashboard/daily-summary': {
+        get: {
+          tags: ['Dashboard'],
+          summary: 'Daily income, expense, net, and count summary — All roles',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: 'from', in: 'query', required: true, schema: { type: 'string', format: 'date' }, example: '2026-01-01' },
+            { name: 'to', in: 'query', required: true, schema: { type: 'string', format: 'date' }, example: '2026-01-31' },
+          ],
+          responses: {
+            200: { description: 'Chronological daily summary rows' },
+            422: { description: 'Invalid or reversed date range' },
+          },
+        },
+      },
+      '/dashboard/monthly-summary': {
+        get: {
+          tags: ['Dashboard'],
+          summary: 'Monthly income, expense, net, and count summary — All roles',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: 'from', in: 'query', required: true, schema: { type: 'string', format: 'date' }, example: '2026-01-01' },
+            { name: 'to', in: 'query', required: true, schema: { type: 'string', format: 'date' }, example: '2026-12-31' },
+          ],
+          responses: {
+            200: { description: 'Chronological monthly summary rows' },
+            422: { description: 'Invalid or reversed date range' },
+          },
+        },
+      },
+      '/dashboard/category-analysis': {
+        get: {
+          tags: ['Dashboard'],
+          summary: 'Category totals and income/expense breakdown — All roles',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: 'from', in: 'query', required: true, schema: { type: 'string', format: 'date' }, example: '2026-01-01' },
+            { name: 'to', in: 'query', required: true, schema: { type: 'string', format: 'date' }, example: '2026-12-31' },
+          ],
+          responses: {
+            200: { description: 'Category analysis rows with type breakdowns' },
+            422: { description: 'Invalid or reversed date range' },
+          },
+        },
+      },
+      '/dashboard/trend-analysis': {
+        get: {
+          tags: ['Dashboard'],
+          summary: 'Chronological income, expense, and net trends — All roles',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: 'from', in: 'query', required: true, schema: { type: 'string', format: 'date' }, example: '2026-01-01' },
+            { name: 'to', in: 'query', required: true, schema: { type: 'string', format: 'date' }, example: '2026-12-31' },
+          ],
+          responses: {
+            200: { description: 'Chronological trend rows suitable for charting' },
+            422: { description: 'Invalid or reversed date range' },
           },
         },
       },
@@ -318,6 +440,46 @@ const options: swaggerJsdoc.Options = {
           ],
           responses: {
             200: { description: 'Recent activity list' },
+          },
+        },
+      },
+      '/reconciliation/compare': {
+        post: {
+          tags: ['Reconciliation'],
+          summary: 'Compare active internal transactions with supplied reference data',
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['referenceTransactions'],
+                  properties: {
+                    referenceTransactions: {
+                      type: 'array',
+                      maxItems: 10000,
+                      items: {
+                        type: 'object',
+                        required: ['id', 'amount', 'type', 'category'],
+                        properties: {
+                          id: { type: 'string', format: 'uuid' },
+                          amount: { type: 'number', example: 1500 },
+                          type: { type: 'string', enum: ['income', 'expense'] },
+                          category: { type: 'string', example: 'Salary' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            200: { description: 'Reconciliation summary and mismatch details' },
+            401: { description: 'Authentication required' },
+            403: { description: 'Admin or analyst role required' },
+            422: { description: 'Malformed reference transaction data' },
           },
         },
       },

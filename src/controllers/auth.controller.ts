@@ -12,7 +12,7 @@ export const register = catchAsync(async (req: Request, res: Response): Promise<
     return;
   }
 
-  const { name, email, password, role } = parsed.data;
+  const { name, email, password } = parsed.data;
 
   const existing = await User.findOne({ email });
   if (existing) {
@@ -20,7 +20,7 @@ export const register = catchAsync(async (req: Request, res: Response): Promise<
     return;
   }
 
-  const user = await User.create({ name, email, password, role });
+  const user = await User.create({ name, email, password });
   const token = signToken(String(user._id), user.role);
 
   sendSuccess(

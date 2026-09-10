@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
 import recordRoutes from './routes/record.routes';
 import dashboardRoutes from './routes/dashboard.routes';
+import reconciliationRoutes from './routes/reconciliation.routes';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -25,6 +26,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/records', recordRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/reconciliation', reconciliationRoutes);
 
 // 404 — no route matched
 app.use((_req, res) => {

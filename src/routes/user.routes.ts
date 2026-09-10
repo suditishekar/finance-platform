@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { listUsers, getUser, updateUser, deleteUser } from '../controllers/user.controller';
+import { createUser, listUsers, getUser, updateUser, deleteUser } from '../controllers/user.controller';
 import { requireAuth, requireRole } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -8,6 +8,7 @@ const router = Router();
 router.use(requireAuth, requireRole('admin'));
 
 router.get('/', listUsers);
+router.post('/', createUser);
 router.get('/:id', getUser);
 router.patch('/:id', updateUser);
 router.delete('/:id', deleteUser);
