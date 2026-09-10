@@ -1,141 +1,294 @@
-# Finance Backend
+# Finance
 
-A TypeScript backend API for Finance with role-based access control, PostgreSQL-backed transaction management, analytics, and reconciliation.
+A full-stack personal finance management application built with React, TypeScript, Express, MongoDB, and PostgreSQL.
 
-## Stack
+## Features
 
-- **Runtime:** Node.js + TypeScript
-- **Framework:** Express
-- **Database:** MongoDB (Atlas) via Mongoose for users/auth; PostgreSQL for transactions
-- **Auth:** JWT + bcrypt
-- **Validation:** Zod
-- **Frontend:** React + TypeScript + Vite in `frontend/`
+- JWT authentication with bcrypt password hashing
+- Role-based access control: viewer, analyst, admin
+- MongoDB-backed authentication and user management
+- PostgreSQL-backed financial transactions
+- Transaction CRUD, filtering, pagination, and soft deletion
+- Daily, monthly, category, and trend analytics
+- Custom date-range analysis
+- Transaction reconciliation against external reference data
+- Admin user management
+- Responsive React frontend
+- Reusable forms and modal components
+- INR-first currency display with selectable display currency
+- Zod request validation
+- Automated backend tests
+
+## Tech Stack
+
+- Frontend: React, TypeScript, Vite, React Router
+- Backend: Node.js, Express, TypeScript
+- Authentication: JWT, bcrypt
+- Validation: Zod
+- User/Auth Database: MongoDB + Mongoose
+- Financial Database: PostgreSQL + pg
+- Testing: Vitest
+
+## Architecture
+
+The application uses a hybrid database architecture:
+
+React Frontend
+       │
+       │ REST API
+       ▼
+Express + TypeScript
+    │          │
+    ▼          ▼
+ MongoDB   PostgreSQL
+ Users     Transactions
+ Auth      Analytics
+
+MongoDB handles users and authentication, while PostgreSQL handles financial transactions and analytical queries. This separates authentication concerns from financial data and allows PostgreSQL to efficiently handle relational queries and aggregations.
 
 ## Project Structure
 
-```
-src/
-├── config/db.ts              # MongoDB connection for users/auth
-├── config/postgres.ts        # PostgreSQL pool and transaction table setup
-├── controllers/              # Route handler logic
-├── middleware/               # Auth + error handling
-├── models/                   # Mongoose user model and PostgreSQL transaction model
-├── routes/                   # Route definitions
-├── utils/                    # JWT, response helpers, catchAsync
-└── validators/               # Zod input schemas
-```
+finance/
+├── frontend/       # React + TypeScript frontend
+├── src/
+│   ├── config/     # Database configuration
+│   ├── controllers/
+│   ├── middleware/
+│   ├── models/
+│   ├── routes/
+│   ├── services/
+│   ├── utils/
+│   └── validators/
+├── tests/          # Backend tests
+├── package.json
+└── README.md
 
-## Setup
+## Getting Started
 
-**1. Clone the repo and install dependencies**
-```bash
-git clone <repo-url>
-cd zorvyn-finance-backend
-npm install
-```
+### Prerequisites
 
-**2. Create a `.env` file using `.env.example` as a reference.** Keep the MongoDB and PostgreSQL credentials out of source control.
+- Node.js 18+
+- MongoDB or MongoDB Atlas
+- PostgreSQL 14+
 
-The backend requires `MONGODB_URI` for existing authentication/user data and `POSTGRES_URL` (or `DATABASE_URL`) for transaction data.
+### Backend
 
-**3. Start the development server**
-```bash
-npm run dev
-```
+Clone the repository and install dependencies:
 
-The server runs on `http://localhost:5000`.
+    git clone <repository-url>
+    cd <repository-directory>
+    npm install
 
-## Roles
+Create a `.env` file in the project root:
 
-| Role     | Dashboard | View Records | Create Records | Update/Delete Records | Manage Users |
-|----------|-----------|--------------|----------------|-----------------------|--------------|
-| viewer   | ✓         | ✗            | ✗             | ✗                     | ✗           |
-| analyst  | ✓         | ✓            | ✗             | ✗                     | ✗           |
-| admin    | ✓         | ✓            | ✓             | ✓                     | ✓           |
+    PORT=5000
+    MONGODB_URI=<your-mongodb-uri>
+    POSTGRES_URL=<your-postgresql-connection-string>
+    JWT_SECRET=<your-secret>
 
-## API Endpoints
+Start the backend:
 
-### Auth — `/api/auth`
+    npm run dev
 
-| Method | Endpoint    | Access | Description              |
-|--------|-------------|--------|--------------------------|
-| POST   | `/register` | Public | Register a new user      |
-| POST   | `/login`    | Public | Login and receive a JWT  |
-| GET    | `/me`       | Any    | Get current user details |
+The backend runs on `http://localhost:5000`.
 
-### Users — `/api/users`
+### Frontend
 
-| Method | Endpoint | Access | Description                        |
-|--------|----------|--------|------------------------------------|
-| GET    | `/`      | Admin  | List all users                     |
-| GET    | `/:id`   | Admin  | Get a single user                  |
-| PATCH  | `/:id`   | Admin  | Update name, role, or status       |
-| DELETE | `/:id`   | Admin  | Deactivate user (soft deactivation)|
+In a separate terminal:
 
-### Financial Records — `/api/records`
+    cd frontend
+    npm install
 
-| Method | Endpoint | Access          | Description                                |
-|--------|----------|-----------------|--------------------------------------------|
-| GET    | `/`      | Admin, Analyst  | List records with filtering + pagination   |
-| GET    | `/:id`   | Admin, Analyst  | Get a single record                        |
-| POST   | `/`      | Admin           | Create a new record                        |
-| PATCH  | `/:id`   | Admin           | Update a record                            |
-| DELETE | `/:id`   | Admin           | Soft delete a record                       |
+Create `frontend/.env`:
 
-**Filtering query params:** `type`, `category`, `from`, `to`, `page`, `limit`
+    VITE_API_BASE_URL=http://localhost:5000/api
 
-### Dashboard — `/api/dashboard`
+Start the frontend:
 
-| Method | Endpoint        | Access | Description                              |
-|--------|-----------------|--------|------------------------------------------|
-| GET    | `/summary`      | Any    | Total income, expenses, net balance      |
-| GET    | `/by-category`  | Any    | Totals grouped by category               |
-| GET    | `/trends`       | Any    | Monthly income/expense for last N months |
-| GET    | `/recent`       | Any    | Most recent N transactions               |
+    npm run dev
 
-Analytics endpoints also include `/daily-summary`, `/monthly-summary`, `/category-analysis`, and `/trend-analysis`; all require authentication and accept validated `from` and `to` date query parameters.
+Vite will display the local frontend URL in the terminal.
 
-### Reconciliation — `/api/reconciliation`
+## Roles & Permissions
 
-| Method | Endpoint  | Access          | Description                                      |
-|--------|-----------|-----------------|--------------------------------------------------|
-| POST   | `/compare`| Admin, Analyst   | Compare active PostgreSQL records with references|
+| Role | Dashboard | View Transactions | Create/Edit/Delete | Manage Users |
+|------|-----------|--------------------|--------------------|--------------|
+| viewer | Yes | No | No | No |
+| analyst | Yes | Yes | No | No |
+| admin | Yes | Yes | Yes | Yes |
 
-The reconciliation request supplies `referenceTransactions` with `id`, `amount`, `type`, and `category`. It reports matched records, missing internal/external records, and field-level mismatches without modifying transactions.
+Public registration always creates a `viewer`. Elevated roles can only be assigned by administrators.
 
-## Request / Response Format
+Authorization is enforced by the backend, independent of frontend visibility.
 
-All responses follow a consistent shape:
+## API
 
-```json
-{ "success": true, "data": { ... } }
-{ "success": false, "message": "Error description" }
-```
+All API routes are prefixed with `/api`.
 
-Authentication is passed as a Bearer token:
-```
-Authorization: Bearer <token>
-```
+### Authentication
 
-## Assumptions and Design Notes
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| POST | `/auth/register` | Public | Register a viewer |
+| POST | `/auth/login` | Public | Login and receive JWT |
+| GET | `/auth/me` | Authenticated | Get current user |
 
-- **Soft deletes:** Financial records are never permanently deleted. A `deletedAt` timestamp is set and the record is excluded from all queries. This preserves data for audit purposes.
-- **Role default:** Newly registered users always default to `viewer`. Role changes are restricted to the admin user-management flow.
-- **Category is free text:** There is no fixed category list. The `type` field is restricted to `income` or `expense`; category can be anything (Salary, Rent, Freelance, etc.).
-- **Password security:** Passwords are hashed with bcrypt (10 salt rounds) and the field is excluded from all database queries by default at the schema level.
-- **No hard deletes on users:** Deleting a user deactivates them (`status: inactive`). Deactivated users cannot log in and their existing tokens are rejected.
+### User Management
 
-## Frontend setup
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| GET | `/users` | Admin | List users |
+| GET | `/users/:id` | Admin | Get user |
+| PATCH | `/users/:id` | Admin | Update user, role, or status |
+| DELETE | `/users/:id` | Admin | Deactivate user |
 
-```bash
-cd frontend
-npm install
-copy .env.example .env
-npm run dev
-```
+### Transactions
 
-Set `VITE_API_BASE_URL` to the backend API base URL, normally `http://localhost:5000/api`. The frontend stores its JWT in the browser session and stores workspace currency preferences locally; selecting a currency changes display formatting only and does not perform foreign-exchange conversion.
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| GET | `/records` | Admin, Analyst | List transactions |
+| GET | `/records/:id` | Admin, Analyst | Get transaction |
+| POST | `/records` | Admin | Create transaction |
+| PATCH | `/records/:id` | Admin | Update transaction |
+| DELETE | `/records/:id` | Admin | Soft-delete transaction |
+
+Supported filters: `type`, `category`, `from`, `to`, `page`, `limit`.
+
+### Dashboard
+
+| Endpoint | Description |
+|----------|-------------|
+| `/dashboard/summary` | Overall financial summary |
+| `/dashboard/by-category` | Category totals |
+| `/dashboard/trends` | Monthly income/expense trends |
+| `/dashboard/recent` | Recent transactions |
+
+### Analytics
+
+| Endpoint | Description |
+|----------|-------------|
+| `/dashboard/daily-summary` | Daily summary |
+| `/dashboard/monthly-summary` | Monthly summary |
+| `/dashboard/category-analysis` | Category analysis |
+| `/dashboard/trend-analysis` | Trend analysis |
+
+Analytics endpoints require authentication and support validated date ranges where applicable.
+
+### Reconciliation
+
+    POST /api/reconciliation/compare
+
+Available to admins and analysts.
+
+Compares active PostgreSQL transactions against externally supplied reference transactions and identifies:
+
+- Matched transactions
+- Missing internal records
+- Missing external records
+- Amount mismatches
+- Type mismatches
+- Category mismatches
+- Reconciliation summary counts
+
+The operation is read-only and does not modify transactions.
+
+## Authentication
+
+Protected endpoints require a JWT bearer token:
+
+    Authorization: Bearer <token>
+
+Authentication and role authorization are enforced by the backend.
+
+## Validation & Data Integrity
+
+Zod validation is used for API inputs, including:
+
+- Required fields
+- Transaction amounts and types
+- Categories and dates
+- UUID parameters
+- Pagination
+- Query filters
+- Reconciliation payloads
+
+PostgreSQL queries use parameterized statements.
+
+Protected database fields such as identifiers, timestamps, and deletion fields cannot be arbitrarily supplied by clients.
+
+## Data & Soft Deletion
+
+Transactions contain amount, type, category, description, transaction date, and timestamps.
+
+Financial transactions use soft deletion. Deleted records are excluded from normal queries and analytics while remaining available for audit and data integrity.
+
+User deletion results in account deactivation. Deactivated users cannot log in, and their existing tokens are rejected.
+
+## Currency
+
+The application defaults to INR.
+
+Users can select a different display currency. This changes display formatting only; no foreign-exchange conversion is performed and stored transaction amounts are not modified.
+
+## API Response Format
+
+Successful response:
+
+    {
+      "success": true,
+      "data": {}
+    }
+
+Error response:
+
+    {
+      "success": false,
+      "message": "Error description"
+    }
+
+## Security
+
+The application includes:
+
+- JWT authentication
+- bcrypt password hashing
+- Backend role-based authorization
+- Server-side input validation
+- Parameterized SQL queries
+- Soft deletion
+- Safe public registration defaults
+- Deactivated account protection
+- Protected administrative endpoints
+
+Never commit `.env` files, database credentials, JWT secrets, or other sensitive configuration.
 
 ## Testing
 
-Backend deterministic unit tests run with `npm test`. They cover reconciliation comparison behavior and validation boundaries. Full database-backed API and browser acceptance flows require configured local MongoDB/PostgreSQL services and should be verified in the local environment.
+Run backend tests:
+
+    npm test
+
+The test suite covers reconciliation behavior and validation boundaries.
+
+For full end-to-end testing, configure MongoDB and PostgreSQL and run both the backend and frontend locally.
+
+## Build
+
+Backend:
+
+    npm run build
+
+Frontend:
+
+    cd frontend
+    npm run build
+
+## Development Notes
+
+The frontend and backend are maintained in the same repository.
+
+The frontend communicates with the backend through the REST API. The backend owns authentication, authorization, validation, database access, and business logic.
+
+## License
+
+This project is intended for educational and portfolio purposes.
